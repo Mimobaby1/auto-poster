@@ -1,0 +1,56 @@
+name: poster
+
+# Insta-Slots 08:00 / 13:00 / 19:00 Berliner Zeit. GitHub rechnet in UTC, darum laufen beide
+# Varianten (Winterzeit UTC+1 und Sommerzeit UTC+2); ein Lauf ohne fälligen Post endet sofort.
+# Jeder Lauf füllt außerdem den Buffer-Vorrat für TikTok auf.
+on:
+  schedule:
+    - cron: "1 6,7,11,12,17,18 * * *"
+  workflow_dispatch:
+    inputs:
+      trocken:
+        description: "Nur anzeigen, nichts posten"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: poster
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q httpx==0.28.1
+      - name: Git für state.json
+        run: |
+          git config user.name "auto-poster"
+          git config user.email "auto-poster@users.noreply.github.com"
+      - name: Lauf
+        id: lauf
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+          POSTER_GIT_SYNC: "1"
+          TZ: Europe/Berlin
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.trocken }}" = "true" ]; then
+            python -m poster tick --trocken
+          else
+            python -m poster tick
+          fi
+      - name: Nach dem letzten Tag abschalten
+        if: steps.lauf.outputs.fertig == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable poster.yml --repo "${{ github.repository }}"

@@ -1,0 +1,22 @@
+{
+  "start_datum": null,
+  "aktiv": false,
+  "zeitzone": "Europe/Berlin",
+  "quelle": "../Kmas-Cutter/projekte/real-man/ausgabe/promos/3_test",
+  "media_base_url": "https://mimobaby1.github.io/auto-poster",
+  "insta_slots": {
+    "insta_test_1": "08:00",
+    "insta_test_2": "13:00",
+    "insta_test_3": "19:00"
+  },
+  "insta_trial": "MANUAL",
+  "insta_abstand_min": 30,
+  "ig_api_version": "v23.0",
+  "tiktok_zeit": "18:00",
+  "tiktok_kanaele": {
+    "tiktok_acc1": "",
+    "tiktok_acc2": "",
+    "tiktok_acc3": ""
+  },
+  "buffer_vorrat": 10
+}
