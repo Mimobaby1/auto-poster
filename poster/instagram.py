@@ -117,6 +117,14 @@ def konto_id_ermitteln(http: httpx.Client, token: str, version: str = "v23.0") -
     if host_fuer(token) == GRAPH_HOST:
         return str(_antwort(http.get(f"{GRAPH_HOST}/{version}/me", params={"fields": "user_id"},
                                      headers=auth, timeout=30)).get("user_id", ""))
+    # Systemnutzer-Token (Unified Login): zugewiesene Instagram-Konten
+    zugewiesen = _antwort(http.get(f"{FACEBOOK_HOST}/{version}/me/assigned_instagram_accounts",
+                                   params={"fields": "id,username"}, headers=auth, timeout=30)).get("data", [])
+    if len(zugewiesen) == 1:
+        return str(zugewiesen[0]["id"])
+    if len(zugewiesen) > 1:
+        namen = ", ".join("@" + str(z.get("username")) for z in zugewiesen)
+        raise PosterFehler(f"Der Token sieht mehrere Instagram-Konten ({namen}) – IG_USER_ID bitte festlegen.")
     daten = _antwort(http.get(f"{FACEBOOK_HOST}/{version}/debug_token", params={"input_token": token},
                               headers=auth, timeout=30)).get("data", {})
     for g in daten.get("granular_scopes", []):

@@ -230,6 +230,8 @@ def test_facebook_token_nutzt_graph_facebook():
 
     def handler(req):
         urls.append(str(req.url))
+        if "assigned_instagram_accounts" in str(req.url):
+            return httpx.Response(200, json={"data": [{"id": "1784", "username": "kmas_baby"}]})
         if "debug_token" in str(req.url):
             return httpx.Response(200, json={"data": {"granular_scopes": [
                 {"scope": "instagram_content_publish", "target_ids": ["1784"]}]}})
