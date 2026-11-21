@@ -35,3 +35,18 @@ def test_workflow_cron_deckt_alle_slots():
     stunden = {int(h) for h in yml.split('cron: "1 ')[1].split(" ")[0].split(",")}
     for slot in (8, 13, 19):
         assert slot - 1 in stunden and slot - 2 in stunden
+
+
+def test_env_setzen_ersetzt_und_ergaenzt(tmp_path):
+    from poster.iglogin import env_setzen
+    env = tmp_path / ".env"
+    env.write_text("IG_ACCESS_TOKEN=alt\nBUFFER_API_KEY=x\n")
+    env_setzen(env, {"IG_ACCESS_TOKEN": "neu\\1", "IG_USER_ID": "17"})
+    assert env.read_text() == "IG_ACCESS_TOKEN=neu\\1\nBUFFER_API_KEY=x\nIG_USER_ID=17\n"
+
+
+def test_login_link():
+    from poster.iglogin import login_link
+    url = login_link("123", "https://mimobaby1.github.io/auto-poster/callback.html")
+    assert "client_id=123" in url and "instagram_business_content_publish" in url
+    assert "redirect_uri=https%3A%2F%2Fmimobaby1.github.io%2Fauto-poster%2Fcallback.html" in url

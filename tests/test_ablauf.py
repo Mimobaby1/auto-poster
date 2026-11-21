@@ -223,3 +223,21 @@ def test_fertig(cfg, tmp_path):
     l, state = lauf(cfg, tmp_path, uhr, FakeInsta())
     l.ausfuehren()
     assert l.fertig()
+
+
+def test_facebook_token_nutzt_graph_facebook():
+    urls = []
+
+    def handler(req):
+        urls.append(str(req.url))
+        if "debug_token" in str(req.url):
+            return httpx.Response(200, json={"data": {"granular_scopes": [
+                {"scope": "instagram_content_publish", "target_ids": ["1784"]}]}})
+        return httpx.Response(200, json={"id": "c9"})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        insta = ig.aus_umgebung(http, "v23.0", "EAAxyz", "")
+        assert insta.user_id == "1784"
+        insta.testreel_container("https://v/x.mp4", "hi", "MANUAL")
+    assert urls[-1].startswith("https://graph.facebook.com/v23.0/1784/media")
+    assert all("EAAxyz" not in u.split("input_token=")[0] for u in urls)

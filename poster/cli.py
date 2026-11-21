@@ -246,6 +246,32 @@ def test_buffer(cfg: konf.Config, args) -> int:
         return 0
 
 
+def ig_link(cfg: konf.Config, args) -> int:
+    from . import iglogin
+    app_id = konf.geheimnis("IG_APP_ID", cfg.root)
+    if not app_id:
+        print("IG_APP_ID fehlt in der .env (Instagram-App-ID von der Meta-Seite).")
+        return 1
+    print(iglogin.login_link(app_id, iglogin.redirect_uri(cfg.media_base_url)))
+    return 0
+
+
+def ig_token(cfg: konf.Config, args) -> int:
+    from . import iglogin
+    werte = {n: konf.geheimnis(n, cfg.root) for n in ("IG_APP_ID", "IG_APP_SECRET", "IG_CODE")}
+    fehlt = [n for n, v in werte.items() if not v]
+    if fehlt:
+        print("Fehlt in der .env: " + ", ".join(fehlt))
+        return 1
+    with _http() as http:
+        token, user_id, sekunden = iglogin.code_tauschen(http, werte["IG_APP_ID"], werte["IG_APP_SECRET"],
+                                                         iglogin.redirect_uri(cfg.media_base_url), werte["IG_CODE"])
+        name = ig.Instagram(http, token, user_id, cfg.ig_api_version).ich().get("username")
+    iglogin.env_setzen(cfg.root / ".env", {"IG_ACCESS_TOKEN": token, "IG_USER_ID": user_id, "IG_CODE": ""})
+    print(f"Token für @{name} gespeichert, gültig {sekunden // 86400} Tage.")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m poster")
     sub = parser.add_subparsers(dest="befehl", required=True)
@@ -266,11 +292,13 @@ def main(argv=None) -> int:
     p = sub.add_parser("test-buffer", help="Machbarkeitstest Buffer (plant ein und löscht sofort)")
     p.add_argument("ziel", help="tiktok_acc1 oder eine Kanal-ID")
     p.add_argument("--datei", default="test_01.mp4")
+    sub.add_parser("ig-link", help="Plan B: Login-Link für Instagram ausgeben")
+    sub.add_parser("ig-token", help="Plan B: Code aus der .env gegen einen 60-Tage-Token tauschen")
     args = parser.parse_args(argv)
 
     cfg = konf.laden()
     befehle = {"einlesen": einlesen, "plan": plan_zeigen, "pruefen": pruefen, "start": start, "stop": stop,
-               "status": status, "tick": tick, "test-insta": test_insta, "test-buffer": test_buffer}
+               "status": status, "tick": tick, "ig-link": ig_link, "ig-token": ig_token, "test-insta": test_insta, "test-buffer": test_buffer}
     try:
         return befehle[args.befehl](cfg, args)
     except PosterFehler as exc:

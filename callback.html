@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auto-Poster Login</title>
+<style>
+:root{--bg:#111;--fg:#eee;--box:#222;--ok:#7ddc8a}
+@media (prefers-color-scheme: light){:root{--bg:#f6f6f6;--fg:#111;--box:#fff;--ok:#1a7f37}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,system-ui,sans-serif;padding:32px 16px}
+main{max-width:560px;margin:0 auto}
+textarea{width:100%;box-sizing:border-box;height:110px;font:14px ui-monospace,Menlo,monospace;background:var(--box);color:var(--fg);border:1px solid #555;border-radius:8px;padding:10px}
+button{margin-top:12px;font-size:17px;padding:12px 18px;border-radius:8px;border:0;background:#0a84ff;color:#fff;cursor:pointer}
+#ok{color:var(--ok);margin-left:10px}
+</style></head><body><main>
+<h1>Fast geschafft</h1>
+<p id="info">Kopiere den Code unten und füge ihn in TextEdit hinter <b>IG_CODE=</b> ein, dann Cmd + S.</p>
+<textarea id="code" readonly></textarea>
+<button id="kopieren">Code kopieren</button><span id="ok"></span>
+<p>Der Code gilt nur ca. 1 Stunde und nur einmal.</p>
+</main>
+<script>
+const q = new URLSearchParams(location.search);
+const code = (q.get("code") || "").replace(/#_$/, "");
+const fehler = q.get("error_description") || q.get("error");
+document.getElementById("code").value = code || ("Kein Code erhalten. " + (fehler || ""));
+document.getElementById("kopieren").onclick = async () => {
+  try { await navigator.clipboard.writeText(code); document.getElementById("ok").textContent = "kopiert ✓"; }
+  catch (e) { const t = document.getElementById("code"); t.select(); document.execCommand("copy"); document.getElementById("ok").textContent = "kopiert ✓"; }
+};
+// Code nicht in der Adresszeile/Verlauf stehen lassen
+history.replaceState(null, "", location.pathname);
+</script></body></html>

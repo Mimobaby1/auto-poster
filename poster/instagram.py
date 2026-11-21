@@ -15,7 +15,12 @@ import httpx
 
 from .fehler import PosterFehler
 
-GRAPH_HOST = "https://graph.instagram.com"
+GRAPH_HOST = "https://graph.instagram.com"      # Token aus dem Instagram-Login (beginnt mit IG…)
+FACEBOOK_HOST = "https://graph.facebook.com"    # Token aus Facebook/Business-Portfolio (beginnt mit EAA…)
+
+
+def host_fuer(token: str) -> str:
+    return FACEBOOK_HOST if token.startswith("EAA") else GRAPH_HOST
 GRADUATION = ("MANUAL", "SS_PERFORMANCE")
 
 # status_code eines Containers
@@ -46,16 +51,20 @@ def trial_params(strategie: str) -> str:
 
 class Instagram:
     def __init__(self, http: httpx.Client, token: str, user_id: str, version: str = "v23.0",
-                 host: str = GRAPH_HOST, schlafen: Callable[[float], None] = time.sleep):
+                 host: str = None, schlafen: Callable[[float], None] = time.sleep):
         if not token or not user_id:
             raise PosterFehler("IG_ACCESS_TOKEN oder IG_USER_ID fehlt.")
         self.http = http
         self.user_id = user_id
-        self.basis = f"{host}/{version}"
+        self.host = host or host_fuer(token)
+        self.basis = f"{self.host}/{version}"
         self.headers = {"Authorization": f"Bearer {token}"}
         self.schlafen = schlafen
 
     def ich(self) -> dict:
+        if self.host == FACEBOOK_HOST:
+            return _antwort(self.http.get(f"{self.basis}/{self.user_id}", params={"fields": "id,username"},
+                                          headers=self.headers, timeout=30))
         return _antwort(self.http.get(f"{self.basis}/me", params={"fields": "user_id,username,account_type"},
                                       headers=self.headers, timeout=30))
 
@@ -102,7 +111,32 @@ def http_client() -> httpx.Client:
     return httpx.Client(follow_redirects=True)
 
 
+def konto_id_ermitteln(http: httpx.Client, token: str, version: str = "v23.0") -> str:
+    """Findet die Instagram-Konto-ID zum Token, falls IG_USER_ID leer ist."""
+    auth = {"Authorization": f"Bearer {token}"}
+    if host_fuer(token) == GRAPH_HOST:
+        return str(_antwort(http.get(f"{GRAPH_HOST}/{version}/me", params={"fields": "user_id"},
+                                     headers=auth, timeout=30)).get("user_id", ""))
+    daten = _antwort(http.get(f"{FACEBOOK_HOST}/{version}/debug_token", params={"input_token": token},
+                              headers=auth, timeout=30)).get("data", {})
+    for g in daten.get("granular_scopes", []):
+        if g.get("scope") == "instagram_content_publish" and g.get("target_ids"):
+            if len(g["target_ids"]) > 1:
+                raise PosterFehler("Der Token sieht mehrere Instagram-Konten – IG_USER_ID bitte festlegen.")
+            return str(g["target_ids"][0])
+    # Über die Facebook-Seite, mit der das Insta verknüpft ist
+    seiten = _antwort(http.get(f"{FACEBOOK_HOST}/{version}/me/accounts",
+                               params={"fields": "name,instagram_business_account"},
+                               headers=auth, timeout=30)).get("data", [])
+    konten = [s["instagram_business_account"]["id"] for s in seiten if s.get("instagram_business_account")]
+    if len(konten) == 1:
+        return str(konten[0])
+    if len(konten) > 1:
+        raise PosterFehler("Der Token sieht mehrere Instagram-Konten – IG_USER_ID bitte festlegen.")
+    raise PosterFehler("Der Token sieht noch kein Instagram-Konto (im Business-Portfolio dem Systemnutzer zuweisen).")
+
+
 def aus_umgebung(http: httpx.Client, version: str, token: str, user_id: str) -> Optional[Instagram]:
-    if not token or not user_id:
+    if not token:
         return None
-    return Instagram(http, token, user_id, version)
+    return Instagram(http, token, user_id or konto_id_ermitteln(http, token, version), version)
